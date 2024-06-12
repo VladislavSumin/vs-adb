@@ -18,7 +18,7 @@ impl<T> AdbConnection<T> where T: AsyncRead, T: AsyncWrite, T: Unpin {
 
     /// Encode msg and send it to adb server.
     pub async fn write(&mut self, msg: &str) -> AdbResult<()> {
-        let hex_length = format!("{:0>4X}", u16::try_from(msg.len()).unwrap());
+        let hex_length = format!("{:0>4X}", msg.len() as u16);
         self.stream.write_all(hex_length.as_bytes()).await?;
         self.stream.write_all(msg.as_bytes()).await?;
         Ok(())
