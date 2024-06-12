@@ -18,7 +18,7 @@ impl TryFrom<&[u8; 4]> for AdbResponseCode {
             _ => {
                 let str_response = from_utf8(value)
                     .map_err(move |_| { AdbError::AdbResponseCodeParseError(value.clone()) })?;
-                Err(AdbError::UnknownAdbResponseCode(str_response.to_owned()))
+                Err(AdbError::UnknownAdbResponseCodeError(str_response.to_owned()))
             }
         }
     }

@@ -1,7 +1,8 @@
 mod adb_response_code;
 mod adb_error;
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::str::from_utf8;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use crate::adb_error::AdbResult;
 use crate::adb_response_code::AdbResponseCode;
@@ -44,7 +45,26 @@ impl AdbConnection {
 
         println!("Response code: {:#?}", response_code);
 
+        let len = self.read_length().await?;
+
+        print!("Response len: {}", len);
+
+        let mut buff = vec![];
+        self.stream.read_to_end(&mut buff).await?;
+        let message = from_utf8(buff.as_slice())?;
+        println!("Message len = {}", message.len());
+        println!("Message: {}", message);
+
         Ok("".to_owned())
+    }
+
+    async fn read_length(&mut self) -> AdbResult<usize> {
+        let mut buff: [u8; 4] = [0; 4];
+        self.stream.read_exact(&mut buff).await?;
+
+        let response = from_utf8(&buff)?;
+
+        Ok(usize::from_str_radix(response, 16)?)
     }
 
     fn encode_message(msg: &str) -> String {
