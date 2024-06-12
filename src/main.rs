@@ -12,7 +12,7 @@ async fn main() {
     let client = AdbClient::default();
 
     let mut conn = client.connect().await.unwrap();
-    conn.write("host:version").await.unwrap();
+    conn.write("host:version2").await.unwrap();
     conn.read().await.unwrap();
 }
 

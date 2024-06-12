@@ -4,7 +4,8 @@ use crate::adb_error::AdbError;
 
 #[derive(Debug)]
 pub enum AdbResponseCode {
-    Okay
+    Okay,
+    Fail,
 }
 
 impl TryFrom<&[u8; 4]> for AdbResponseCode {
@@ -13,6 +14,7 @@ impl TryFrom<&[u8; 4]> for AdbResponseCode {
     fn try_from(value: &[u8; 4]) -> Result<Self, Self::Error> {
         match value {
             b"OKAY" => { Ok(Self::Okay) }
+            b"FAIL" => { Ok(Self::Fail) }
             _ => {
                 let str_response = from_utf8(value)
                     .map_err(move |_| { AdbError::AdbResponseCodeParseError(value.clone()) })?;
