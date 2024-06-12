@@ -41,6 +41,12 @@ impl<T> AdbConnection<T> where T: AsyncRead, T: AsyncWrite, T: Unpin {
         Ok(vec)
     }
 
+    /// Read single string message from adb server.
+    pub async fn read_string(&mut self) -> AdbResult<String> {
+        let data = self.read_data().await?;
+        Ok(from_utf8(data.as_slice())?.to_owned())
+    }
+
     /// Execute command expect no message from adb server.
     pub async fn execute_unit(&mut self, command: &str) -> AdbResult<()> {
         self.write(command).await?;
@@ -59,8 +65,7 @@ impl<T> AdbConnection<T> where T: AsyncRead, T: AsyncWrite, T: Unpin {
     pub async fn execute_string(&mut self, command: &str) -> AdbResult<String> {
         self.write(command).await?;
         let response_code = self.read_response_code().await?;
-        let data = self.read_data().await?;
-        let message = from_utf8(data.as_slice())?.to_owned();
+        let message = self.read_string().await?;
 
         if response_code == Okay {
             Ok(message)

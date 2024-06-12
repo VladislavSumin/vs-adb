@@ -1,4 +1,5 @@
 use tokio::net::TcpStream;
+use tokio::sync::mpsc;
 use crate::adb_connection::AdbConnection;
 use crate::adb_error::AdbResult;
 
@@ -25,8 +26,24 @@ impl AdbClient {
 
     /// Return devices list.
     pub async fn devices(&self) -> AdbResult<String> {
-        Ok(self.execute_string("host:devices").await?)
+        Ok(self.execute_string("host:devices-l").await?)
     }
+
+    /// Track connected devices.
+    /// Returns every state changes (one per device, don't collect final state).
+    pub async fn track_devices(&self) -> AdbResult<mpsc::Receiver<AdbResult<String>>> {
+        let mut connection = self.connect().await?;
+        connection.execute_unit("host:track-devices-l").await?;
+        let (tx, rx) = mpsc::channel(1);
+        tokio::spawn(async move {
+            loop {
+                let msg = connection.read_string().await;
+                tx.send(msg).await.unwrap();
+            }
+        });
+        Ok(rx)
+    }
+
 
     async fn connect(&self) -> AdbResult<AdbConnection<TcpStream>> {
         AdbConnection::connect(self.addr.clone()).await
