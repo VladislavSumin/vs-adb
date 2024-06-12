@@ -10,5 +10,5 @@ async fn main() {
     let client = AdbClient::default();
 
     let version = client.get_server_version().await.unwrap();
-    println!("Adb server version: {version}")
+    println!("Adb server version: {version}");
 }

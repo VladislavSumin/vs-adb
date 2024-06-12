@@ -17,32 +17,48 @@ impl<T> AdbConnection<T> where T: AsyncRead, T: AsyncWrite, T: Unpin {
     }
 
     /// Encode msg and send it to adb server.
-    pub async fn write(&mut self, msg: &str) -> AdbResult<()> {
+    async fn write(&mut self, msg: &str) -> AdbResult<()> {
         let hex_length = format!("{:0>4X}", msg.len() as u16);
         self.stream.write_all(hex_length.as_bytes()).await?;
         self.stream.write_all(msg.as_bytes()).await?;
         Ok(())
     }
 
-    /// TODO write documentation
-    pub async fn read(&mut self) -> AdbResult<String> {
+    /// Reads 4 bytes of input stream and cast it to [AdbResponseCode].
+    async fn read_response_code(&mut self) -> AdbResult<AdbResponseCode> {
         let mut buff = [0u8; 4];
-
-        // Read and check response code
         self.stream.read_exact(&mut buff).await?;
-        let response_code = AdbResponseCode::try_from(&buff)?;
+        AdbResponseCode::try_from(&buff)
+    }
 
-        // Read data len
+    /// Read 4 bytes of data length and then read data.
+    async fn read_data(&mut self) -> AdbResult<Vec<u8>> {
+        let mut buff = [0u8; 4];
         self.stream.read_exact(&mut buff).await?;
         let len = usize::from_str_radix(from_utf8(buff.as_slice())?, 16)?;
+        let mut vec = vec![0u8; len];
+        self.stream.read_exact(vec.as_mut_slice()).await?;
+        Ok(vec)
+    }
 
-        // Read message
-        let mut buff = vec![];
-        self.stream.read_to_end(&mut buff).await?;
-        let message = from_utf8(buff.as_slice())?.to_owned();
+    pub async fn execute_unit(&mut self, command: &str) -> AdbResult<()> {
+        self.write(command).await?;
+        let response_code = self.read_response_code().await?;
 
-        // TODO temp check
-        assert_eq!(message.len(), len);
+        if response_code == Okay {
+            Ok(())
+        } else {
+            let data = self.read_data().await?;
+            let message = from_utf8(data.as_slice())?.to_owned();
+            Err(AdbServerError(response_code, message))
+        }
+    }
+
+    pub async fn execute_string(&mut self, command: &str) -> AdbResult<String> {
+        self.write(command).await?;
+        let response_code = self.read_response_code().await?;
+        let data = self.read_data().await?;
+        let message = from_utf8(data.as_slice())?.to_owned();
 
         if response_code == Okay {
             Ok(message)

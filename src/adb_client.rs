@@ -17,8 +17,13 @@ impl AdbClient {
     /// Return adb server internal version number
     pub async fn get_server_version(&self) -> AdbResult<u32> {
         let mut connection = self.connect().await?;
-        connection.write("host:version").await?;
-        Ok(connection.read().await?.parse()?)
+        let result = connection.execute_string("host:version").await?;
+        Ok(result.parse()?)
+    }
+
+    pub async fn kill(&self) -> AdbResult<()> {
+        let mut connection = self.connect().await?;
+        connection.execute_unit("host:kill").await
     }
 
     async fn connect(&self) -> AdbResult<AdbConnection<TcpStream>> {
