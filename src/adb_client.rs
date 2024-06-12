@@ -6,7 +6,6 @@ pub struct AdbClient {
     addr: String,
 }
 
-
 impl AdbClient {
     pub fn new<T: ToString>(addr: T) -> Self {
         Self {
@@ -14,20 +13,31 @@ impl AdbClient {
         }
     }
 
-    /// Return adb server internal version number
-    pub async fn get_server_version(&self) -> AdbResult<u32> {
-        let mut connection = self.connect().await?;
-        let result = connection.execute_string("host:version").await?;
-        Ok(result.parse()?)
+    /// Return adb server internal version number.
+    pub async fn version(&self) -> AdbResult<u32> {
+        Ok(self.execute_string("host:version").await?.parse()?)
     }
 
+    /// Stops adb server.
     pub async fn kill(&self) -> AdbResult<()> {
-        let mut connection = self.connect().await?;
-        connection.execute_unit("host:kill").await
+        self.execute_unit("host:kill").await
+    }
+
+    /// Return devices list.
+    pub async fn devices(&self) -> AdbResult<String> {
+        Ok(self.execute_string("host:devices").await?)
     }
 
     async fn connect(&self) -> AdbResult<AdbConnection<TcpStream>> {
         AdbConnection::connect(self.addr.clone()).await
+    }
+
+    async fn execute_string(&self, command: &str) -> AdbResult<String> {
+        self.connect().await?.execute_string(command).await
+    }
+
+    async fn execute_unit(&self, command: &str) -> AdbResult<()> {
+        self.connect().await?.execute_unit(command).await
     }
 }
 

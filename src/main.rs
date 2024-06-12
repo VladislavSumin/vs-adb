@@ -9,6 +9,9 @@ mod adb_client;
 async fn main() {
     let client = AdbClient::default();
 
-    let version = client.get_server_version().await.unwrap();
+    let version = client.version().await.unwrap();
     println!("Adb server version: {version}");
+
+    let devices = client.devices().await.unwrap();
+    println!("Devices: {devices}")
 }
