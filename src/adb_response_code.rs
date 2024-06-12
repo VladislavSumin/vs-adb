@@ -2,7 +2,7 @@ use std::str::from_utf8;
 
 use crate::adb_error::AdbError;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum AdbResponseCode {
     Okay,
     Fail,

@@ -1,9 +1,12 @@
 use std::str::from_utf8;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
+use crate::adb_error::AdbError::AdbServerError;
 use crate::adb_error::AdbResult;
 use crate::adb_response_code::AdbResponseCode;
+use crate::adb_response_code::AdbResponseCode::Okay;
 
+/// Represent connection with adb server.
 pub(crate) struct AdbConnection<T> where T: AsyncRead, T: AsyncWrite, T: Unpin {
     stream: T,
 }
@@ -13,11 +16,15 @@ impl<T> AdbConnection<T> where T: AsyncRead, T: AsyncWrite, T: Unpin {
         Self { stream }
     }
 
+    /// Encode msg and send it to adb server.
     pub async fn write(&mut self, msg: &str) -> AdbResult<()> {
-        self.stream.write_all(Self::encode_message(msg).as_bytes()).await?;
+        let hex_length = format!("{:0>4X}", u16::try_from(msg.len()).unwrap());
+        self.stream.write_all(hex_length.as_bytes()).await?;
+        self.stream.write_all(msg.as_bytes()).await?;
         Ok(())
     }
 
+    /// TODO write documentation
     pub async fn read(&mut self) -> AdbResult<String> {
         let mut buff = [0u8; 4];
 
@@ -25,33 +32,23 @@ impl<T> AdbConnection<T> where T: AsyncRead, T: AsyncWrite, T: Unpin {
         self.stream.read_exact(&mut buff).await?;
         let response_code = AdbResponseCode::try_from(&buff)?;
 
-        println!("Response code: {:#?}", response_code);
+        // Read data len
+        self.stream.read_exact(&mut buff).await?;
+        let len = usize::from_str_radix(from_utf8(buff.as_slice())?, 16)?;
 
-        let len = self.read_length().await?;
-
-        print!("Response len: {}", len);
-
+        // Read message
         let mut buff = vec![];
         self.stream.read_to_end(&mut buff).await?;
-        let message = from_utf8(buff.as_slice())?;
-        println!("Message len = {}", message.len());
-        println!("Message: {}", message);
+        let message = from_utf8(buff.as_slice())?.to_owned();
 
-        Ok("".to_owned())
-    }
+        // TODO temp check
+        assert_eq!(message.len(), len);
 
-    async fn read_length(&mut self) -> AdbResult<usize> {
-        let mut buff: [u8; 4] = [0; 4];
-        self.stream.read_exact(&mut buff).await?;
-
-        let response = from_utf8(&buff)?;
-
-        Ok(usize::from_str_radix(response, 16)?)
-    }
-
-    fn encode_message(msg: &str) -> String {
-        let hex_length = format!("{:0>4X}", u16::try_from(msg.len()).unwrap());
-        format!("{}{}", hex_length, msg)
+        if response_code == Okay {
+            Ok(message)
+        } else {
+            Err(AdbServerError(response_code, message))
+        }
     }
 }
 
